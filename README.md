@@ -5,7 +5,8 @@ This pipeline is used to run the RNA-Seq workflow for performing Differential Ex
 
 ### RNA Seq QC pipeline used
 1. The split replicate fastq files were first merged so that we obtain 2 replicates per state.
-2. The merged fastq files underwent quality trimming, FastQC stats generation using the `trim_qc_contaminant_phix_plasmid_seq_filter.sh`. The script can be run by simply typing - 
+2. Before proceeding with running the shell scripts. Place the `truseq_adapter.fasta`, `phix.fasta`, `plasmid.fasta` and the `ecoli_DH10B_ref_genome_NCBI_sequence.fasta` files in a location which can be accessed by the `trim_qc_contaminant_phix_plasmid_seq_filter.sh` file. **Make sure that you update the trim_qc_contaminant_phix_plasmid_seq_filter.sh file to reflect the updated locations for the adapter sequence file, contaminant sequence file, plasmid.fasta and the ecoli reference genome files**
+3. The merged fastq files underwent quality trimming, FastQC stats generation using the `trim_qc_contaminant_phix_plasmid_seq_filter.sh`. The script can be run by simply typing - 
 ```
 ./trim_qc_contaminant_phix_plasmid_seq_filter.sh <dir_name>
 
@@ -13,28 +14,28 @@ where <dir_name> = where all the merged fastq.gz sample files are located
 ```
 * This script generates 3 folders and 1 file `qc_reads`, `phix_qc_reads`, `plasmid_removed_reads` and `multiqc_report.html`
 I generated a multiqc report of all the FastQC stats on every .fastq file in 1 report called `multiqc_report.html`. For further downstream processing, we are only interested in files present in `plasmid_removed_reads` folder.
-3. TruSeq adapter reads, phix reads (a regular illumina spike-in) and plasmid sequences were removed from the qc-ed fastq by using the bbduk.sh script from the bbMap tools package within the `trim_qc_contaminant_phix_plasmid_seq_filter.sh` file. The script can be used as shown in step #2.
-4. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR using the `run_starjob.sh`. The script can be run by simply typing - 
+4. TruSeq adapter reads, phix reads (a regular illumina spike-in) and plasmid sequences were removed from the qc-ed fastq by using the bbduk.sh script from the bbMap tools package within the `trim_qc_contaminant_phix_plasmid_seq_filter.sh` file. The script can be used as shown in step #2.
+5. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR using the `run_starjob.sh`. The script can be run by simply typing - 
 ```
 ./run_starjob.sh <qc_dir_name>
 
 where <qc_dir_name> = where all the unzipped .fastq sample files from the `plasmid_removed_reads` folder exist.
 
 ``` 
-5. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome. This is dont by simply typing - 
+6. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome. This is dont by simply typing - 
 ```
 ./htseq-counts <aligned_files_dir>
 
 where <aligned_files_dir> contain all the .bam alignments generated in step #4
 ```
 
-6. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
+7. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
 ```
 ./concat_counts.sh <counts_file_dir>
 
 where <counts_file_dir> = directory containing all the sample specific counts generated in step #5
 ```
-* Steps 1 thru 6 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
+* Steps 1 thru 7 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
 * The merged count matrix file generated in Step #5 is further used to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
 
 ### Running the Differential expression Analysis workflow
