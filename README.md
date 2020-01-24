@@ -28,16 +28,16 @@ where <qc_dir_name> = where all the unzipped .fastq sample files from the `plasm
 where <aligned_files_dir> contain all the .bam alignments generated in step #4
 ```
 
-5. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
+6. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
 ```
 ./concat_counts.sh <counts_file_dir>
 
 where <counts_file_dir> = directory containing all the sample specific counts generated in step #5
 ```
-6. Steps 1 thru 5 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
-7. The merged count matrix file generated in Step #5 is further used to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
+* Steps 1 thru 6 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
+* The merged count matrix file generated in Step #5 is further used to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
 
-Running the Differential expression Analysis workflow
+### Running the Differential expression Analysis workflow
 1. This step can be run on a server with R server installed. Make sure you ahev the latest version of R server installed.
 2. Once you have confirmed the installation, type `R` in your command prompt which will take you to the R environment.
 3. Install all the necessary packages needed to run the R DESeq2 workflow by typing the following - 
@@ -45,7 +45,9 @@ Running the Differential expression Analysis workflow
 install.packages(c("tibble","reshape2","RColorBrewer","pheatmap","dplyr","ggplot2","optparse"))
 ```
 To install DESeq2 you can refer the link - [DESeq2 installation](http://bioconductor.org/packages/release/bioc/html/DESeq2.html)
-4. Once all the packages are installed you are ready to run the workflow. **Note: Make sure the merged counts matrix file, the gene_annotation file and the .R script exist in the same folder**
+
+4. Once all the packages are installed you are ready to run the workflow. **NOTE: Make sure the merged counts matrix file, the gene_annotation file and the .R script exist in the same folder**
+
 5. Go to your command prompt and type - 
 ```
 Rscript --vanilla Data_Challenge_Asimov.R --help
