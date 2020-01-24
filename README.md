@@ -26,27 +26,27 @@ STAR --runMode genomeGenerate --genomeDir star-genome --genomeFastaFiles ecoli_D
 ```
 **Make sure that the ecoli reference fasta file location is properly mentioned while creating a genome index file**
 
-5. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR using the `run_starjob.sh`. The script can be run by simply typing - 
+6. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR using the `run_starjob.sh`. The script can be run by simply typing - 
 ```
 ./run_starjob.sh <qc_dir_name>
 
 where <qc_dir_name> = where all the unzipped .fastq sample files from the `plasmid_removed_reads` folder exist.
 
 ``` 
-6. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome. This is dont by simply typing - 
+7. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome. This is dont by simply typing - 
 ```
 ./htseq-counts <aligned_files_dir>
 
 where <aligned_files_dir> contain all the .bam alignments generated in step #4
 ```
 
-7. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
+8. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
 ```
 ./concat_counts.sh <counts_file_dir>
 
 where <counts_file_dir> = directory containing all the sample specific counts generated in step #5
 ```
-* Steps 1 thru 7 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
+* Steps 1 thru 8 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
 * The merged count matrix file generated in Step #5 is further used to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
 
 ### Running the differential expression analysis workflow
