@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ### Set up directory structure
-BASE_DIR=/home/gvadali/ecoli
+BASE_DIR=$1
 
 #Part1 - QC and Adaptor removal
 ADAPT=$BASE_DIR/truseq_adapters.fasta

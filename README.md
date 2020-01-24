@@ -5,8 +5,54 @@ This pipeline is used to run the RNA-Seq workflow for performing Differential Ex
 
 ### RNA Seq QC pipeline used
 1. The split replicate fastq files were first merged so that we obtain 2 replicates per state.
-2. The merged fastq files underwent quality trimming, FastQC stats generation using the `trim_qc_contaminant_phix_plasmid_seq_filter.sh`. I generated a multiqc report of all the FastQC stats on every .fastq file in 1 report.
-3. TruSeq adapter reads, phix reads (a regular illumina spike-in) and plasmid sequences were removed from the qc-ed fastq by using the bbduk.sh script from the bbMap tools package within the `trim_qc_contaminant_phix_plasmid_seq_filter.sh` file.
-4. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR.The script used was `run_starjob.sh`
-5. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome and generate a merged count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline.
-6. In the respoitory you will find all the scripts needed to run the QC pipeline and the files needed to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
+2. The merged fastq files underwent quality trimming, FastQC stats generation using the `trim_qc_contaminant_phix_plasmid_seq_filter.sh`. The script can be run by simply typing - 
+```
+./trim_qc_contaminant_phix_plasmid_seq_filter.sh <dir_name>
+
+where <dir_name> = where all the merged fastq.gz sample files are located
+```
+* This script generates 3 folders and 1 file `qc_reads`, `phix_qc_reads`, `plasmid_removed_reads` and `multiqc_report.html`
+I generated a multiqc report of all the FastQC stats on every .fastq file in 1 report called `multiqc_report.html`. For further downstream processing, we are only interested in files present in `plasmid_removed_reads` folder.
+3. TruSeq adapter reads, phix reads (a regular illumina spike-in) and plasmid sequences were removed from the qc-ed fastq by using the bbduk.sh script from the bbMap tools package within the `trim_qc_contaminant_phix_plasmid_seq_filter.sh` file. The script can be used as shown in step #2.
+4. Once checked for all of the above, the fastq files were then aligned to the ecoli refeence genome downloaded from NCBI-RefSeq using a splice aware aligner, STAR using the `run_starjob.sh`. The script can be run by simply typing - 
+```
+./run_starjob.sh <qc_dir_name>
+
+where <qc_dir_name> = where all the unzipped .fastq sample files from the `plasmid_removed_reads` folder exist.
+
+``` 
+5. Once aligned to the reference genome, `htseq-counts` was used to count the genes mapped to the genome. This is dont by simply typing - 
+```
+./htseq-counts <aligned_files_dir>
+
+where <aligned_files_dir> contain all the .bam alignments generated in step #4
+```
+
+5. The sample specific count files are then merged into a count matrix file to feed through the DESeq2 RNA-Seq analysis pipeline. This can be done by simply typing - 
+```
+./concat_counts.sh <counts_file_dir>
+
+where <counts_file_dir> = directory containing all the sample specific counts generated in step #5
+```
+6. Steps 1 thru 5 are run on a linux based OS. All the required scripts to run the RNA-Seq QC pipeline can be found in the repository 
+7. The merged count matrix file generated in Step #5 is further used to run the RNA Seq DE analysis workflow to obtain the differential genes between the two states.
+
+Running the Differential expression Analysis workflow
+1. This step can be run on a server with R server installed. Make sure you ahev the latest version of R server installed.
+2. Once you have confirmed the installation, type `R` in your command prompt which will take you to the R environment.
+3. Install all the necessary packages needed to run the R DESeq2 workflow by typing the following - 
+```
+install.packages(c("tibble","reshape2","RColorBrewer","pheatmap","dplyr","ggplot2","optparse"))
+```
+To install DESeq2 you can refer the link - [DESeq2 installation](http://bioconductor.org/packages/release/bioc/html/DESeq2.html)
+4. Once all the packages are installed you are ready to run the workflow. **Note: Make sure the merged counts matrix file, the gene_annotation file and the .R script exist in the same folder**
+5. Go to your command prompt and type - 
+```
+Rscript --vanilla Data_Challenge_Asimov.R --help
+```
+This will run the script and display the help section mentioning what command line argurments you need to give to run the workflow.
+6. To run the workflow, simply type - 
+```
+Rscript --vanilla Data_Challenge_Asimov.R --counts_file <merged_counts.txt> --annot_file <geneIDs_name.txt> --outdir <the folder where all the 3 files exist> (as mentioned in the **NOTE** in step #4.
+```
+7. when you hit enter, the script runs and generates 1 folder and 2 output files. The folder consists of all the plots generated by the R workflow. The 2 files are the significant gene files with Log2 fold change and p.adjusted value information in 1 file and the normalized counts for the significnat genes in another file.

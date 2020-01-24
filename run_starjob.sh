@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-BASE_DIR=/nfs/vedanta/home/gvadali/ecoli
+BASE_DIR=$1
 READS_DIR=$BASE_DIR/plasmid_removed_reads
 OP_DIR=$BASE_DIR/aligned
 

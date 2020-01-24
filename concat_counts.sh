@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ### Set up directory structure
-BASE_DIR=/nfs/vedanta/home/gvadali/ecoli/htseq_counts
+BASE_DIR=$1
 
 cd $BASE_DIR
 

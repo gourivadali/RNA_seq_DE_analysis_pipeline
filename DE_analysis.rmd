@@ -1,0 +1,218 @@
+---
+title: "Untitled"
+author: "Gouri Vadali"
+date: "1/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Loading Libraries
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(pheatmap)
+library(reshape2)
+library(RColorBrewer)
+library(DESeq2)
+
+```
+
+### Data wrangling 
+
+```{r}
+
+counts_data <- read.table("merged_counts.txt", header = FALSE, sep = '\t')
+colnames(counts_data) <- c("gene","counts","sample")
+ecoli_annot <- read.table("geneIDs_name.txt", header = TRUE, sep = '\t')
+
+counts_data <- counts_data %>% filter(grepl("gene:",gene)) %>% filter(counts >= 50) %>% distinct(.keep_all = TRUE)
+
+counts_data$gene <- gsub("gene:","",counts_data$gene)
+
+counts_data <- tidyr::spread(counts_data,sample,counts, fill = 0)
+
+rownames(counts_data) <- counts_data$gene
+
+counts_data$gene <- NULL
+```
+
+### Plotting Count Distribution
+
+```{r}
+counts_distrib <- melt(counts_data)
+
+ggplot(counts_distrib, aes(x = value, fill = variable))+ geom_density(aes(alpha = 0.1))+theme_bw()+xlim(0,10000)
+
+# As you can see in the plot below - there is a large number of genes with low count gene and many genes with 0 counts. The right tail here indicates that there is no limit for maximum expression in RNA Seq. There is always expression variation between biological replicates, hence negative bionomial model is ideal for RNA Seq data. 
+```
+
+### Generate Metadata
+
+```{r}
+
+genotype <- c("ecoli_dh10","ecoli_dh10","ecoli_dh10","ecoli_dh10")
+
+condition <- c("state1","state1","state2","state2")
+
+ecoli_dh10_metadata <- data.frame(genotype, condition)
+
+rownames(ecoli_dh10_metadata) <- c("ecoli_state1_merged_rep_1","ecoli_state1_merged_rep_2","ecoli_state2_merged_rep_1","ecoli_state2_merged_rep_2")
+
+```
+
+### DE Analysis - QC - Normalization
+
+```{r}
+
+# Check to see if the rownames in or metadata file is same as colnames in the raw count data
+all(rownames(ecoli_dh10_metadata) == colnames(counts_data))
+
+# Create a DESeq2 object
+dds_ecoli_dh10 <- DESeqDataSetFromMatrix(countData = counts_data, colData = ecoli_dh10_metadata, design = ~ condition)
+
+# The design formula tells us the major source of variation to control for or regress out  as well as the condition of interest for DE testing
+
+# Raw counts should be normalized to account for differences in library depth, asses sample level qulaity metrics
+# DESeq uses "median of ratios" normalization. This method adjusts the raw counts for library size and is resistant to the large numbers of differentially expressed gene
+
+# Estimate size factors
+dds_ecoli_dh10 <- estimateSizeFactors(dds_ecoli_dh10)
+
+sizeFactors(dds_ecoli_dh10)
+
+# Extract the normalized counts from the DESeq2 object
+norm_ecoli_dh10 <- counts(dds_ecoli_dh10, normalized = TRUE)
+
+```
+
+### DE Analysis - Unsupervised Clustering Analysis
+### Hierarchical Clustering & PCA
+### Performed to identify outliers, other major sources of variation in the data,
+### how similar are the samples to each other with regards to gene expression
+
+```{r}
+# Log transform the normalized counts to improve the visualization of the clustering
+# For RNA-Seq data DESeq2 uses a variant stabilizing clustering, which is a log transformation that moderates the variance across the mean
+
+vsd_ecoli_dh10 <- vst(dds_ecoli_dh10, blind = TRUE)
+
+### Hierarchical Clustering with correlation heatmaps
+
+vsd_mat <- assay(vsd_ecoli_dh10)
+
+# Compute pairwise correlation values
+vsd_cor <- cor(vsd_mat)
+
+pheatmap(vsd_cor, annotation = select(ecoli_dh10_metadata, condition))
+
+# The heatmap shows that the samples within groups are clustering together and the conditions luster separately. The DE genes between our consitions might be likely driving the separation.  
+
+### PCA - finds the variation present in the dataset.
+plotPCA(vsd_ecoli_dh10, intgroup = "condition")
+
+# The sample groups separate well and the variation is most expalined by PC1.
+
+```
+
+### Modeling raw counts for each gene
+
+```{r}
+# SInce we did not find any outliers, we proceed with running the Negative Binomial model on the DESEq2 object created earlier
+
+# Run analysis
+dds_ecoli_dh10 <- DESeq(dds_ecoli_dh10)
+
+# How well did our data fit the model? The DESeq2 model uses the dispersion to assess the variability in expression when modeling the counts. This is done by plotting for dispersion estimates
+
+plotDispEsts(dds_ecoli_dh10)
+
+# We expect the dispersion values to decrease with increasing mean in RNA Seq data. The plot below shows a cloud of data around the maximum likelihood line dont fully follow it. This can be due to contamination or presence of sample outliers
+
+```
+
+### Shrinking of Log2 Fold changes
+
+```{r}
+# Extract the DE results
+# DESeq2 automatically performs Wald test for pairwise correlation to test for differences in expression between two samples within a condition
+
+# Define the levels to be compared withn the condition. Here we are comapring the state to state1 which is the base-level.
+# To avoid genes with large log2FC and low mean count values which might be unlikely accurate
+# as these genes might have low information associated with them such as genes with low count values or high dispersion values
+# To improve the estimated FC, we can perform log2FC shrinkage - for genes with low amounts of information associated with them  shrinkages uses information from all genes to generate more likely, lower log2 FC
+
+ecoli_res <- results(dds_ecoli_dh10, contrast = c("condition","state2","state1"), alpha = 0.05) # Alpha denotes the significance.
+
+ecoli_res <- lfcShrink(dds_ecoli_dh10, contrast = c("condition","state2","state1"), res = ecoli_res)
+
+plotMA(ecoli_res, ylim=c(-8,8))
+# Genes that are significantly DE are colored in red
+# This is a more restriced log2FC values especially for genes with low information available
+```
+
+### DESEq2 results
+
+```{r}
+
+summary(ecoli_res)
+# We can include a 1.25 log2FC threshold and retest for significant genes
+
+ecoli_res <- results(dds_ecoli_dh10, contrast = c("condition","state2","state1"), alpha = 0.05, lfcThreshold = 0.32) # Alpha denotes the significance.
+
+ecoli_res <- lfcShrink(dds_ecoli_dh10, contrast = c("condition","state2","state1"), res = ecoli_res)
+
+summary(ecoli_res)
+
+#Join the annotation table with the results
+
+ecoli_res_all <- data.frame(ecoli_res) %>% rownames_to_column(.,var = "gene")
+
+ecoli_annot$gene <- as.character(ecoli_annot$gene)
+ecoli_res_all$gene <- as.character(ecoli_res_all$gene)
+
+ecoli_res_all <- left_join(ecoli_res_all, ecoli_annot, by = "gene")
+
+# Subset the significant genes
+
+sig_ecoli_dh10 <- subset(ecoli_res_all, padj < 0.05) %>% filter(!is.na(name)) %>% arrange(padj)
+
+```
+
+### Visulaization
+
+```{r}
+# Expression heatmap - plotting the normalized count values instead of the ample correlation values 
+
+# Subset the normalized counts of the Significnat genes
+
+sig_norm_counts_ecoli_dh10 <- norm_ecoli_dh10[sig_ecoli_dh10$gene,]
+
+heat_colors <- brewer.pal(6, "YlOrRd")
+
+pheatmap(sig_norm_counts_ecoli_dh10,color = heat_colors,cluster_rows = T,show_rownames = F,annotation = select(ecoli_dh10_metadata, condition),scale = "row")
+
+# We see the expression levels for the significant genes cluster by sample group which is the case for our data
+
+# Volcano plot
+# Obtain logical vector regarding whether padj values are less than 0.05 
+ecoli_res_all <- ecoli_res_all %>% mutate(threshold = padj < 0.05)
+
+ggplot(ecoli_res_all) + geom_point(aes(x = log2FoldChange, y = -log10(padj),color = threshold)) + xlab("log2 fold change") + ylab("-log10 adjusted p-value") + theme(legend.position = "none",plot.title = element_text(size = rel(1.5), hjust = 0.5), axis.title = element_text(size = rel(1.25)))+theme_bw()
+
+# Expression plot
+top_genes <- data.frame(sig_norm_counts_ecoli_dh10) %>% rownames_to_column(var = "gene")
+
+top_genes <- tidyr::gather(top_genes,key = "samplename",value = "normalized_counts",2:5)
+
+# Join with the metadata
+top_genes <- left_join(top_genes,rownames_to_column(ecoli_dh10_metadata, var = "samplename"), by = "samplename")
+
+ggplot(top_genes) + geom_point(aes(x = gene, y = normalized_counts, color = condition)) + scale_y_log10() + xlab("Genes") + ylab("Normalized Counts") + ggtitle("Top Significant DE Genes") + theme_bw() +  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
