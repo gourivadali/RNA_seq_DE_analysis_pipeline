@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 
-### Set up directory structure
+### Files Required
+# truseq_adapters.fasta
+# phix.fasta
+# plasmid.fasta
+# all the merged .fastq.gz files
+# GFF and GTF file present from the base directory
+
+
+### Provide the entire location of the directory where all the files in the Files Required section exist
 BASE_DIR=$1
 
 #Part1 - QC and Adaptor removal
 ADAPT=$BASE_DIR/truseq_adapters.fasta
 
 #Part2 - Contaminant removal
-CONT=/home/gvadali/contaminants/phix.fasta
+CONT=$BASE_DIR/phix.fasta
 
 #Part3 - Plasmid sequences removal
-PLS=/home/gvadali/ecoli/plasmid.fasta
+PLS=$BASE_DIR/plasmid.fasta
 
 OUT_DIR1=$BASE_DIR/qc_reads
 OUT_DIR2=$BASE_DIR/phix_qc_reads
@@ -123,5 +131,60 @@ F=`basename $i _qc_phix.fastq`;
                 gchist=$OUT_DIR3/stats_log/"$F".GCcontent.hist \
                 k=$MAXK_Adapter mm=f overwrite=t \
                 &> $OUT_DIR3/run_log/"$F".log
+
+done
+
+## PART 4 - Running splice-aware Alignment using STAR
+
+OUT_DIR4=$BASE_DIR/aligned
+
+mkdir -p $OUT_DIR4
+mkdir -p $BASE_DIR/star-genome
+
+# Make a Genome Index file
+STAR --runMode genomeGenerate --genomeDir $BASE_DIR/star-genome --genomeFastaFiles $BASE_DIR/ecoli_DH10B_ref_genome_NCBI_sequence.fasta --runThreadN 2 --genomeSAindexNbases 10
+
+cd $OUT_DIR3
+
+for i in `ls -1 *.fastq`;do
+
+F=`basename $i _qc_phix_pls.fastq`;
+
+	STAR --genomeDir $BASE_DIR/star-genome \
+		--readFilesIn $OUT_DIR3/"$F"_qc_phix_pls.fastq \
+		--runThreadN 6 \
+		--sjdbGTFfile $BASE_DIR/ecoli_dh10b_annotation.gff3 --sjdbGTFtagExonParentTranscript Parent \
+		--limitBAMsortRAM 1155063793 \
+		--outSAMtype BAM SortedByCoordinate \
+		--outFileNamePrefix $OUT_DIR4/"$F";
+
+done
+
+## PART 5 - Generating a counts files for each sample using htseq-counts
+
+GTF_file=$BASE_DIR/ecoli_dh10b_annotation.gtf
+OUT_DIR5=$BASE_DIR/htseq_counts
+
+mkdir -p $OUT_DIR5
+
+cd $OUT_DIR4
+
+for i in `ls -1 *.bam`;do
+
+F=`basename $i Aligned.sortedByCoord.out.bam`;
+
+htseq-count -t exon -i gene_id -f bam "$F"Aligned.sortedByCoord.out.bam $GTF_file > $OUT_DIR5/"$F"_counts.out
+
+done
+
+## PART 6 - Merging counts file into one.
+
+cd $OUT_DIR5
+
+for i in `ls -1 *_counts.out`;do
+
+F=`basename $i _counts.out`;
+
+cat "$F"_counts.out | sed -e "s/$/\t$F/" >> $BASE_DIR/merged_counts.txt
 
 done
